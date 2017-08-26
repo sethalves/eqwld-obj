@@ -3,7 +3,7 @@
 #
 
 
-LIBS='(seth pbm)' '(foldling command-line)' '(seth obj-model)' '(srfi 95)' '(seth graph)' '(seth scad-model)' '(seth octree)' '(seth port-extras)'
+LIBS='(seth pbm)' '(foldling command-line)' '(seth obj-model)' '(srfi 95)' '(seth graph)' '(seth scad-model)' '(seth octree)' '(seth port-extras)' '(seth ieee-754)'
 
 %.obj.gz: %.obj
 	cat $< | gzip -9 - > $@
