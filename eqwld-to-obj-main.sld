@@ -1,6 +1,11 @@
 
 
-;; http://www.voronoi.com/wiki/index.php?title=Main_Page
+
+;; -- use ImageMagicK to convert
+;; for file in *.bmp
+;; do
+;;     convert "$file" "$(basename "$file" .bmp).png"
+;; done
 
 
 (define-library (eqwld-to-obj-main)
@@ -138,9 +143,131 @@
                  (loop (read-string-from-hash wld-data j i string-hash)))))))
 
 
-    (define (read-fragment-36-mesh-plain wld-data i old name model)
+    (define-record-type <fragment-3>
+      (make-fragment-3 filenames)
+      fragment-3?
+      (filenames fragment-3-filenames fragment-3-set-filenames!) ;; list of filenames
+      )
+
+    (define (read-fragment-3-texture-filenames wld-data i frag-index old name model frags)
+      (let* ((step-i-16 (lambda () (let ((orig-i i)) (set! i (+ i 2)) orig-i)))
+             (read-word (lambda () (read-word wld-data (step-i-16))))
+             (step-i-32 (lambda () (let ((orig-i i)) (set! i (+ i 4)) orig-i)))
+             (read-dword (lambda () (read-dword wld-data (step-i-32))))
+             ;;
+             (filename-count-raw (read-dword))
+             (filename-count (if (= filename-count-raw 0) 1 filename-count-raw))
+             (filename-hash (make-hash-table)))
+
+        (let loop ((j 0))
+          (cond ((= j filename-count) #t)
+                (else
+                 (let* ((name-length (read-word)))
+                   (set! i (read-string-from-hash wld-data i i filename-hash))
+                   (loop (+ j 1))))))
+
+        (cerr "fragment 3, frag-index = " frag-index ", size = " filename-count
+              ", filenames = " (hash-table-values filename-hash) "\n")
+        (vector-set! frags frag-index (make-fragment-3 (hash-table-values filename-hash)))
+        #t))
+
+
+    (define-record-type <fragment-4>
+      (make-fragment-4 flags params1 params2 references)
+      fragment-4?
+      (flags fragment-4-flags fragment-4-set-flags!)
+      (params1 fragment-4-params1 fragment-4-set-params1!)
+      (params2 fragment-4-params2 fragment-4-set-params2!)
+      (references fragment-4-references fragment-4-set-references!)) ;; a vector of fragment-3 references
+
+    (define (read-fragment-4-texture wld-data i frag-index old name model frags)
+      (let* ((step-i-32 (lambda () (let ((orig-i i)) (set! i (+ i 4)) orig-i)))
+             (read-dword (lambda () (read-dword wld-data (step-i-32))))
+             ;;
+             (flags (read-dword))
+             (size (read-dword))
+             (params1 (if (> (bitwise-and flags #x04) 0) (read-dword) #f))
+             (params2 (if (> (bitwise-and flags #x08) 0) (read-dword) #f))
+             )
+        (let loop ((j 0)
+                   (refs '()))
+          (cond ((= j size)
+                 (cerr "fragment 4, frag-index = " frag-index ", flags = " flags ", refs = " refs "\n")
+                 (vector-set! frags frag-index (make-fragment-4 flags params1 params2 (list->vector (reverse refs)))))
+                (else
+                 (loop (+ j 1)
+                       (cons (- (read-dword) 1) refs)))))))
+
+
+    (define-record-type <fragment-5>
+      (make-fragment-5 reference flags)
+      fragment-5?
+      (reference fragment-5-reference fragment-5-set-reference!) ;; reference to a fragment-4
+      (flags fragment-5-flags fragment-5-set-flags!))
+
+    (define (read-fragment-5-texture wld-data i frag-index old name model frags)
+      (let* ((step-i-32 (lambda () (let ((orig-i i)) (set! i (+ i 4)) orig-i)))
+             (read-dword (lambda () (read-dword wld-data (step-i-32))))
+             ;;
+             (reference (- (read-dword) 1))
+             (flags (read-dword))
+             ;; ... etc
+             )
+        (cerr "fragment 5, frag-index = " frag-index ", flags = " flags "\n")
+        (vector-set! frags frag-index (make-fragment-5 reference flags))
+        #t))
+
+
+    (define-record-type <fragment-30>
+      (make-fragment-30 reference flags)
+      fragment-30?
+      (reference fragment-30-reference fragment-30-set-reference!) ;; reference to a fragment-5
+      (flags fragment-30-flags fragment-30-set-flags!))
+
+
+    (define (read-fragment-30-texture wld-data i frag-index old name model frags)
+      (let* ((step-i-32 (lambda () (let ((orig-i i)) (set! i (+ i 4)) orig-i)))
+             (read-dword (lambda () (read-dword wld-data (step-i-32))))
+             (read-float-dword (lambda () (read-float-dword wld-data (step-i-32))))
+             ;;
+             (flags (read-dword))
+             (params1 (read-dword))
+             (params2 (read-dword))
+             (params3-0 (read-float-dword))
+             (params3-1 (read-float-dword))
+             (pair-field (if (= flags 0) (begin (read-dword) (read-dword)) #f))
+             (reference (- (read-dword) 1))
+             )
+        (cerr "fragment 30, frag-index = " frag-index ", flags = " flags ", ref = " reference "\n")
+        (vector-set! frags frag-index (make-fragment-30 reference flags))
+        #t))
+
+
+    (define-record-type <fragment-31>
+      (make-fragment-31 flags textures)
+      fragment-31?
+      (flags fragment-31-flags fragment-31-set-flags!)
+      (textures fragment-31-textures fragment-31-set-textures!)) ;; a vector of fragment-30 textures
+
+    (define (read-fragment-31-textures wld-data i frag-index old name model frags)
+      (let* ((step-i-32 (lambda () (let ((orig-i i)) (set! i (+ i 4)) orig-i)))
+             (read-dword (lambda () (read-dword wld-data (step-i-32))))
+             ;;
+             (flags (read-dword))
+             (size (read-dword)))
+        (let loop ((j 0)
+                   (refs '()))
+          (cond ((= j size)
+                 (cerr "fragment 31, frag-index = " frag-index ", flags = " flags ", refs = " refs "\n")
+                 (vector-set! frags frag-index (make-fragment-31 flags (list->vector (reverse refs)))))
+                (else
+                 (loop (+ j 1)
+                       (cons (- (read-dword) 1) refs)))))))
+
+
+    (define (read-fragment-36-mesh-plain wld-data i frag-index old name model frags)
       (let* ((recip-127 (/ 1.0 127.0))
-             (recip-255 (/ 1.0 256.0))
+             (recip-255 (/ 1.0 255.0))
              ;;
              (step-i-8 (lambda () (let ((orig-i i)) (set! i (+ i 1)) orig-i)))
              (step-i-16 (lambda () (let ((orig-i i)) (set! i (+ i 2)) orig-i)))
@@ -154,7 +281,7 @@
              (read-float-dword (lambda () (read-float-dword wld-data (step-i-32))))
              ;;
              (flags (read-dword))
-             (fragment1 (read-dword))
+             (fragment1 (- (read-dword) 1)) ;; zero based indexing
              (fragment2 (read-dword))
              (fragment3 (read-dword))
              (fragment4 (read-dword))
@@ -184,14 +311,19 @@
              (scale (/ 1.0 (inexact (arithmetic-shift 1 raw-scale))))
              ;;
              (mesh (make-mesh name '()))
-             (material ;; (model-get-material-by-name model "leaf_mtl")
-              #f)
              (vertex-index-start (coordinates-length (model-vertices model)))
              (texture-index-start (coordinates-length (model-texture-coordinates model)))
              (normal-index-start (coordinates-length (model-normals model)))
+             (new-vertex-indexes #f)
+             (vertex-colors #f)
+             (tex-coords #f)
+             (textures (fragment-31-textures (vector-ref frags fragment1)))
+             (new-faces-corners #f)
              )
         (cerr "---\n")
+        (cerr "frag-index = " frag-index "\n")
         (cerr "flags = " (number->string flags 16) "\n")
+        (cerr "fragment1 = " fragment1 "\n")
         (cerr "center = (" center-x " " center-y " " center-z ")\n")
         (cerr "max-dist = " max-dist "\n")
         (cerr "min = (" min-x " " min-y " " min-z ")\n")
@@ -207,27 +339,34 @@
         (cerr "size-9 = " size-9 "\n")
         (cerr "raw-scale = " raw-scale "\n")
         (cerr "scale = " scale "\n")
+        (cerr "textures = " textures "\n")
 
         ;; vertices
-        (do ((j 0 (+ j 1)))
-            ((= j vertex-count) #t)
-          (let* ((x-raw (read-signed-word))
-                 (y-raw (read-signed-word))
-                 (z-raw (read-signed-word))
-                 (x (+ center-x (* x-raw scale)))
-                 (y (+ center-y (* y-raw scale)))
-                 (z (+ center-z (* z-raw scale)))
-                 (v (list->vector (map value->pretty-string (list x y z))))
-                 )
-            (model-append-vertex! model (make-vertex v (vector 'unset 'unset 'unset)))
-            ))
+        (let loop ((j 0)
+                   (rev-new-vertex-indexes '()))
+          (cond ((= j vertex-count)
+                 (set! new-vertex-indexes (reverse rev-new-vertex-indexes)))
+                (else
+                 (let* ((x-raw (read-signed-word))
+                        (y-raw (read-signed-word))
+                        (z-raw (read-signed-word))
+                        (x (+ center-x (* x-raw scale)))
+                        (y (+ center-y (* y-raw scale)))
+                        (z (+ center-z (* z-raw scale)))
+                        (v (list->vector (map value->pretty-string (list x y z))))
+                        (new-index (model-append-vertex! model (make-vertex v (vector 'unset 'unset 'unset)))))
+                   (loop (+ j 1)
+                         (cons new-index rev-new-vertex-indexes))))))
 
-        ;; vertex coords
+
+        ;; vertex texture coords
         (do ((j 0 (+ j 1)))
             ((= j tex-coords-count) #t)
-          (let* ((u-raw (if old (read-signed-word) (read-signed-dword)))
-                 (v-raw (if old (read-signed-word) (read-signed-dword))))
-            #t))
+          (let* ((u-raw (if old (* (read-signed-word) recip-255) (read-signed-dword)))
+                 (v-raw (if old (* (read-signed-word) recip-255)  (read-signed-dword)))
+                 (tv (list->vector (map value->pretty-string (list u-raw (- v-raw))))))
+            (model-append-texture-coordinate! model tv)))
+
 
         ;; normals
         (do ((j 0 (+ j 1)))
@@ -240,29 +379,76 @@
                  (z (* z-raw recip-127))
                  (v (list->vector (map value->pretty-string (list x y z))))
                  )
-            (model-append-normal! model v)
-            ))
+            (model-append-normal! model v)))
 
         ;; vertex colors
-        (do ((j 0 (+ j 1)))
-            ((= j color-count) #t)
-          (let* ((color-raw (read-dword)))
-            #t))
+        ;; -- currently unused
+        (if (> color-count 0)
+            (let loop ((j 0)
+                       (vertex-color-lst '()))
+              (cond ((= j color-count)
+                     (set! vertex-colors (list->vector (reverse vertex-color-lst))))
+                    (else
+                     (let* ((color-raw (read-dword))
+                            (red (arithmetic-shift (bitwise-and color-raw #xff000000) -24))
+                            (green (arithmetic-shift (bitwise-and color-raw #x00ff0000) -16))
+                            (blue (arithmetic-shift (bitwise-and color-raw #x0000ff00) -8))
+                            (alpha (bitwise-and color-raw #x000000ff)))
+                       (loop (+ j 1)
+                             (cons (vector (/ (inexact red) 255.0)
+                                           (/ (inexact green) 255.0)
+                                           (/ (inexact blue) 255.0)
+                                           (/ (inexact alpha) 255.0))
+                                   vertex-color-lst)))))))
 
-        ;; faces
+        (let loop ((j 0)
+                   (rev-new-faces-corners '()))
+          (cond ((= j polygons-count)
+                 (set! new-faces-corners (reverse rev-new-faces-corners)))
+                (else
+                   (let* ((face-flags (read-word))
+                          (v0 (read-word))
+                          (v1 (read-word))
+                          (v2 (read-word))
+                          ;; same number of normals as vertices, so this works:
+                          (face-corner-0 (make-face-corner v0 v0 v0))
+                          (face-corner-1 (make-face-corner v1 v1 v1))
+                          (face-corner-2 (make-face-corner v2 v2 v2))
+                          (face-corners (list face-corner-2 face-corner-1 face-corner-0))
+                          ;; (face (mesh-prepend-face! model mesh face-corners material
+                          ;;                           vertex-index-start texture-index-start normal-index-start))
+                          )
+                     (loop (+ j 1) (cons face-corners rev-new-faces-corners))))))
+
+
+        ;; jump over VertexPiece entries
+        (set! i (+ i (* vertex-piece-count 4)))
+
+        ;; PolygonTex entries
         (do ((j 0 (+ j 1)))
-            ((= j polygons-count) #t)
-          (let* ((face-flags (read-word))
-                 (v0 (read-word))
-                 (v1 (read-word))
-                 (v2 (read-word))
-                 (face-corner-0 (make-face-corner v0 'unset 'unset))
-                 (face-corner-1 (make-face-corner v1 'unset 'unset))
-                 (face-corner-2 (make-face-corner v2 'unset 'unset))
-                 (face-corners (list face-corner-0 face-corner-1 face-corner-2))
-                 )
-            (cerr "face = " (list v0 v1 v2) "\n")
-            (mesh-prepend-face! model mesh face-corners material vertex-index-start texture-index-start normal-index-start)
+            ((= j polygon-tex-count) #t)
+          (let* ((mat-face-count (read-word))
+                 (texture-index (read-word))
+                 (texture-30-index (vector-ref textures texture-index)) ;; a fragment-30
+                 (texture-30 (vector-ref frags texture-30-index))
+                 (texture-5-index (fragment-30-reference texture-30))
+                 (texture-5 (vector-ref frags texture-5-index))
+                 (texture-4-index (fragment-5-reference texture-5))
+                 (texture-4 (vector-ref frags texture-4-index))
+                 (texture-3-index (vector-ref (fragment-4-references texture-4) 0))
+                 (texture-3 (vector-ref frags texture-3-index))
+                 (texture-filename (car (fragment-3-filenames texture-3)))
+                 (material-name (substring (string-downcase texture-filename) 0 (- (string-length texture-filename) 4)))
+                 (material (model-get-material-by-name model material-name)))
+
+            (cerr "material -- count: " mat-face-count ", name: " material-name ", material: " material "\n")
+            (do ((k 0 (+ k 1)))
+                ((= k mat-face-count) #t)
+              ;; (face-set-material! (car new-faces-corners) material)
+              (let ((face-corners (car new-faces-corners)))
+                (mesh-prepend-face! model mesh face-corners material
+                                    vertex-index-start texture-index-start normal-index-start))
+              (set! new-faces-corners (cdr new-faces-corners)))
             #t))
 
 
@@ -272,7 +458,7 @@
         #t))
 
 
-    (define (read-fragment wld-data i old string-hash model)
+    (define (read-fragment wld-data i frag-index old string-hash model frags)
       (let* ((size (read-dword wld-data i))
              (id (read-dword wld-data (+ i 4)))
              (name-key (read-signed-dword wld-data (+ i 8)))
@@ -280,9 +466,20 @@
 
         ;; (cerr "size = " size ", id = " (number->string id 16) ", name = " name-key " = " name "\n")
 
-        (cond ((= id #x36)
-               (read-fragment-36-mesh-plain wld-data (+ i 12) old name model))
-              )
+        (cond
+         ((= id #x03)
+          (read-fragment-3-texture-filenames wld-data (+ i 12) frag-index old name model frags))
+         ((= id #x04)
+          (read-fragment-4-texture wld-data (+ i 12) frag-index old name model frags))
+         ((= id #x05)
+          (read-fragment-5-texture wld-data (+ i 12) frag-index old name model frags))
+         ((= id #x30)
+          (read-fragment-30-texture wld-data (+ i 12) frag-index old name model frags))
+         ((= id #x31)
+          (read-fragment-31-textures wld-data (+ i 12) frag-index old name model frags))
+         ((= id #x36)
+          (read-fragment-36-mesh-plain wld-data (+ i 12) frag-index old name model frags))
+         )
 
         (+ (+ i size) 8)))
 
@@ -348,7 +545,14 @@
                  (header-6 (read-header-6 wld-data (step-i)))
                  (string-hash (read-string-hash wld-data i string-hash-size))
                  (model (make-empty-model))
+                 (frags (make-vector fragment-count #f))
                  )
+
+            (add-material-library model
+                                  (string-append
+                                   (substring wld-filename 0 (- (string-length wld-filename) 4))
+                                   ".mtl"))
+
             (set! i (+ i string-hash-size))
             (cerr "version = " version "\n")
             (cerr "fragment count = " fragment-count "\n")
@@ -360,7 +564,7 @@
             (let loop ((frag-index 0))
               (cond ((= frag-index fragment-count) #t)
                     (else
-                     (set! i (read-fragment wld-data i old string-hash model))
+                     (set! i (read-fragment wld-data i frag-index old string-hash model frags))
                      (loop (+ frag-index 1)))))
 
             (write-obj-model model (current-output-port))
