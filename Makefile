@@ -11,7 +11,7 @@ LIBS='(seth pbm)' '(foldling command-line)' '(seth obj-model)' '(srfi 95)' '(set
 
 all: eqwld-to-obj
 
-eqwld-to-obj-chicken: eqwld-to-obj-chicken.scm
+eqwld-to-obj: eqwld-to-obj-chicken.scm
 	csc -X r7rs $^ -o $@
 
 libs:

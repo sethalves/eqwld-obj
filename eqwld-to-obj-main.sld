@@ -29,11 +29,9 @@
           (seth raster)
           (seth image)
           (seth pbm)
-          (seth graph)
           (seth model-3d)
           (seth obj-model)
           (seth scad-model)
-          (seth octree)
           (seth port-extras)
           (seth ieee-754)
           (seth model-3d)
@@ -265,7 +263,7 @@
                        (cons (- (read-dword) 1) refs)))))))
 
 
-    (define (read-fragment-36-mesh-plain wld-data i frag-index old name model frags)
+    (define (read-fragment-36-mesh-plain wld-data i frag-index old name model frags output-phantom)
       (let* ((recip-127 (/ 1.0 127.0))
              (recip-255 (/ 1.0 255.0))
              ;;
@@ -401,6 +399,7 @@
                                            (/ (inexact alpha) 255.0))
                                    vertex-color-lst)))))))
 
+        ;; read in face corners, add them to model later
         (let loop ((j 0)
                    (rev-new-faces-corners '()))
           (cond ((= j polygons-count)
@@ -415,10 +414,12 @@
                           (face-corner-1 (make-face-corner v1 v1 v1))
                           (face-corner-2 (make-face-corner v2 v2 v2))
                           (face-corners (list face-corner-2 face-corner-1 face-corner-0))
-                          ;; (face (mesh-prepend-face! model mesh face-corners material
-                          ;;                           vertex-index-start texture-index-start normal-index-start))
+                          (is-phantom (> (bitwise-and face-flags #x10) 0))
                           )
-                     (loop (+ j 1) (cons face-corners rev-new-faces-corners))))))
+                     (if (or (and output-phantom is-phantom)
+                             (and (not output-phantom) (not is-phantom)))
+                         (loop (+ j 1) (cons face-corners rev-new-faces-corners))
+                         (loop (+ j 1) (cons '() rev-new-faces-corners)))))))
 
 
         ;; jump over VertexPiece entries
@@ -446,8 +447,9 @@
                 ((= k mat-face-count) #t)
               ;; (face-set-material! (car new-faces-corners) material)
               (let ((face-corners (car new-faces-corners)))
-                (mesh-prepend-face! model mesh face-corners material
-                                    vertex-index-start texture-index-start normal-index-start))
+                (if (not (null? face-corners))
+                    (mesh-prepend-face! model mesh face-corners material
+                                        vertex-index-start texture-index-start normal-index-start)))
               (set! new-faces-corners (cdr new-faces-corners)))
             #t))
 
@@ -458,7 +460,7 @@
         #t))
 
 
-    (define (read-fragment wld-data i frag-index old string-hash model frags)
+    (define (read-fragment wld-data i frag-index old string-hash model frags output-phantom)
       (let* ((size (read-dword wld-data i))
              (id (read-dword wld-data (+ i 4)))
              (name-key (read-signed-dword wld-data (+ i 8)))
@@ -478,7 +480,7 @@
          ((= id #x31)
           (read-fragment-31-textures wld-data (+ i 12) frag-index old name model frags))
          ((= id #x36)
-          (read-fragment-36-mesh-plain wld-data (+ i 12) frag-index old name model frags))
+          (read-fragment-36-mesh-plain wld-data (+ i 12) frag-index old name model frags output-phantom))
          )
 
         (+ (+ i size) 8)))
@@ -490,26 +492,33 @@
         (cerr "eqwld-to-obj [arguments] lines-input-file points-input-file\n")
         (cerr "    --obj                      output an obj file\n")
         (cerr "    --scad                     output an openscad file\n")
+        (cerr "    --phantom                  output parts the character can pass though (else the solid parts)\n")
         (exit 1))
 
       (let* ((args (parse-command-line `((--obj)
                                          (--scad)
+                                         (--phantom)
                                          (-?) (-h))))
              (output-obj #f)
              (output-scad #f)
+             (output-phantom #f)
              (extra-arguments '()))
         (for-each
          (lambda (arg)
            (case (car arg)
              ((-? -h) (usage ""))
              ((--obj)
-              (if (or output-obj output-pnm output-scad output-texture)
+              (if (or output-obj output-scad)
                   (usage "give only one of: --obj --pnm --scad --texture --caves"))
               (set! output-obj #t))
              ((--scad)
-              (if (or output-obj output-pnm output-scad output-texture)
+              (if (or output-obj output-scad)
                   (usage "give only one of: --obj --pnm --scad --texture --caves"))
               (set! output-scad #t))
+             ((--phantom)
+              (if output-phantom
+                  (usage "give --phantom only once"))
+              (set! output-phantom #t))
              ((--)
               (set! extra-arguments (cdr arg)))))
          args)
@@ -533,7 +542,7 @@
                  (cerr (number->string (bytevector-u8-ref wld-data (+ i 2)) 16) "\n")
                  (cerr (number->string (bytevector-u8-ref wld-data (+ i 1)) 16) "\n")
                  (cerr (number->string (bytevector-u8-ref wld-data (+ i 0)) 16) "\n")
-                 (snow-assert false)))
+                 (snow-assert #f)))
           (step-i)
 
           (let* ((version (number->string (read-version wld-data (step-i)) 16))
@@ -564,9 +573,10 @@
             (let loop ((frag-index 0))
               (cond ((= frag-index fragment-count) #t)
                     (else
-                     (set! i (read-fragment wld-data i frag-index old string-hash model frags))
+                     (set! i (read-fragment wld-data i frag-index old string-hash model frags output-phantom))
                      (loop (+ frag-index 1)))))
 
+            (scale-model model 0.2) ;; try to adjust the scale so 1.0 = about a meter
             (write-obj-model model (current-output-port))
             ))
 
