@@ -265,7 +265,7 @@
 
     (define (read-fragment-36-mesh-plain wld-data i frag-index old name model frags output-phantom)
       (let* ((recip-127 (/ 1.0 127.0))
-             (recip-255 (/ 1.0 255.0))
+             (recip-255 (/ 1.0 256.0))
              ;;
              (step-i-8 (lambda () (let ((orig-i i)) (set! i (+ i 1)) orig-i)))
              (step-i-16 (lambda () (let ((orig-i i)) (set! i (+ i 2)) orig-i)))
@@ -362,7 +362,7 @@
             ((= j tex-coords-count) #t)
           (let* ((u-raw (if old (* (read-signed-word) recip-255) (read-signed-dword)))
                  (v-raw (if old (* (read-signed-word) recip-255)  (read-signed-dword)))
-                 (tv (list->vector (map value->pretty-string (list u-raw (- v-raw))))))
+                 (tv (list->vector (map value->pretty-string (list u-raw (- 1.0 v-raw))))))
             (model-append-texture-coordinate! model tv)))
 
 
