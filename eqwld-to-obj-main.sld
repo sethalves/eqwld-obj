@@ -21,6 +21,7 @@
           (snow filesys)
           (foldling command-line)
           (seth cout)
+          (seth math-3d)
           (seth model-3d)
           (seth obj-model)
           (seth scad-model)
@@ -671,6 +672,16 @@
         (model-prepend-mesh! model mesh)))
 
 
+    (define (rotate-model model)
+      (let ((rotated-coords (make-coordinates))
+            (rot-matrix (matrix-rotation-x (- pi/2))))
+        (for-each
+         (lambda (vertex)
+           (let ((rotated-vertex (vertex-transform rot-matrix vertex)))
+             (coordinates-append! rotated-coords rotated-vertex)))
+         (vector->list (coordinates-as-vector (model-vertices model))))
+        (model-set-vertices! model rotated-coords)))
+
 
     (define (main-program)
       (define (usage why)
@@ -800,6 +811,7 @@
                                                               ".mtl"))
                                        (add-fragment-36-to-model frag-36 model)
                                        (scale-model model 0.2) ;; try to adjust the scale so 1.0 = about a meter
+                                       (rotate-model model) ;; make y be up
                                        (write-obj-model model output-handle)
                                        (close-output-port output-handle))))))
                           (fragment-14-refs frag)))))))
@@ -817,6 +829,7 @@
                            (add-fragment-36-to-model frag model)))))
 
                 (scale-model model 0.2) ;; try to adjust the scale so 1.0 = about a meter
+                (rotate-model model) ;; make y be up
                 (write-obj-model model (current-output-port)))))
 
             ))))
