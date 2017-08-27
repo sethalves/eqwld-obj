@@ -9,6 +9,8 @@
 ;; done
 
 
+;; ~/src/eqwld-obj/eqwld-to-obj-gauche.scm --placeables . oggok_obj.wld 2> err
+
 (define-library (eqwld-to-obj-main)
   (export main-program)
   (import (scheme base)
@@ -481,7 +483,6 @@
                         (y (+ center-y (* y-raw scale)))
                         (z (+ center-z (* z-raw scale)))
                         (v (list->vector (map value->pretty-string (list x y z)))))
-                   ;; (model-append-vertex! model (make-vertex v (vector 'unset 'unset 'unset)))
                    (loop (+ j 1) (cons v rev-indices))))))
 
 
@@ -494,7 +495,6 @@
                  (let* ((u-raw (if old (* (read-signed-word) recip-255) (read-signed-dword)))
                         (v-raw (if old (* (read-signed-word) recip-255)  (read-signed-dword)))
                         (tv (list->vector (map value->pretty-string (list u-raw (- 1.0 v-raw))))))
-                   ;; (model-append-texture-coordinate! model tv)
                    (loop (+ j 1) (cons tv rev-tex-coords))))))
 
         ;; normals
@@ -510,7 +510,6 @@
                         (y (* y-raw recip-127))
                         (z (* z-raw recip-127))
                         (v (list->vector (map value->pretty-string (list x y z)))))
-                   ;; (model-append-normal! model v)
                    (loop (+ j 1) (cons v rev-normals))))))
 
         ;; vertex colors
@@ -579,16 +578,30 @@
                         (texture-3-index (vector-ref (fragment-4-references texture-4) 0))
                         (texture-3 (vector-ref frags texture-3-index))
                         (texture-filename (car (fragment-3-filenames texture-3)))
-                        (material-name (substring (string-downcase texture-filename) 0 (- (string-length texture-filename) 4)))
-                        ;; (material (model-get-material-by-name model material-name))
-                        )
+                        (material-name (substring (string-downcase texture-filename) 0 (- (string-length texture-filename) 4))))
                    (cerr "material -- count: " mat-face-count ", name: " material-name "\n")
                    (loop (+ j 1)
                          (cons mat-face-count rev-mat-face-count)
                          (cons material-name rev-material-names))))))
 
+        ;; VertexTex entries
+        (let loop ((j 0))
+          (cond ((= j vertex-tex-count)
+                 #t)
+                (else
+                 (read-2bytes)
+                 (read-2bytes)
+                 (loop (+ j 1)))))
 
-        ;; (model-prepend-mesh! model mesh)
+        (let loop ((j 0))
+          (cond ((= j size-9) #t)
+                (else
+                 (let* ((vertex-index-1 (read-2bytes))
+                        (vertex-index-2 (read-2bytes))
+                        (data9-param1 (read-2bytes))
+                        (data9-type (read-2bytes)))
+                   (cerr "data9: " (list vertex-index-1 vertex-index-2 data9-param1 data9-type) "\n")
+                   (loop (+ j 1))))))
 
         (vector-set! frags frag-index (make-fragment-36 name texture-frag-indices vertices texture-coords vertex-colors
                                                         tex-coords normals mat-face-counts material-names frag-faces-corners))
@@ -650,6 +663,11 @@
          (lambda (v)
            (model-append-vertex! model (make-vertex v (vector 'unset 'unset 'unset))))
          vertices)
+
+        (for-each
+         (lambda (n)
+           (model-append-normal! model n))
+         normals)
 
         (for-each
          (lambda (tv)
@@ -801,7 +819,9 @@
                               (cond ((fragment-36? frag-36)
                                      (let* ((model (make-empty-model))
                                             (output-filename (string-append
-                                                              placeables-output-directory "/x-"
+                                                              placeables-output-directory "/"
+                                                              (fragment-36-name frag-36)
+                                                              "-"
                                                               (number->string frag-index)
                                                               ".obj"))
                                             (output-handle (open-output-file output-filename)))
