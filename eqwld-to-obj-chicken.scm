@@ -12,6 +12,7 @@ exec csi -include-path /usr/local/share/scheme -s $0 "$@"
 (include "snow/input-parse.sld")
 (include "snow/binio.sld")
 (include "snow/random.sld")
+(include "snow/filesys.sld")
 (include "seth/cout.sld")
 (include "seth/raster.sld")
 (include "seth/port-extras.sld")

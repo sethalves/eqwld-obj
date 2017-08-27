@@ -12,5 +12,5 @@ CHIBI_MODULE_PATH="" exec chibi-scheme -A "$DIR" -A "$X" -A . -s "$0" "$@"
 |#
 
 (import (scheme base)
-        (eqwld-to-obj))
+        (eqwld-to-obj-main))
 (main-program)

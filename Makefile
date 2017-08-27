@@ -3,7 +3,7 @@
 #
 
 
-LIBS='(seth pbm)' '(foldling command-line)' '(seth obj-model)' '(srfi 95)' '(seth graph)' '(seth scad-model)' '(seth octree)' '(seth port-extras)' '(seth ieee-754)'
+LIBS='(seth pbm)' '(foldling command-line)' '(seth obj-model)' '(srfi 95)' '(seth graph)' '(seth scad-model)' '(seth octree)' '(seth port-extras)' '(seth ieee-754)' '(snow filesys)'
 
 %.obj.gz: %.obj
 	cat $< | gzip -9 - > $@
@@ -11,7 +11,7 @@ LIBS='(seth pbm)' '(foldling command-line)' '(seth obj-model)' '(srfi 95)' '(set
 
 all: eqwld-to-obj
 
-eqwld-to-obj: eqwld-to-obj-chicken.scm
+eqwld-to-obj: eqwld-to-obj-chicken.scm eqwld-to-obj-main.sld
 	csc -X r7rs $^ -o $@
 
 libs:
@@ -27,7 +27,7 @@ link-libs: very-clean
 
 
 clean:
-	rm -f *~
+	rm -f eqwld-to-obj eqwld-to-obj-chicken.c *~
 
 very-clean: clean
 	rm -rf seth snow srfi foldling
