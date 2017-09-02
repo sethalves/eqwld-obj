@@ -1,0 +1,49 @@
+-*- org -*-
+
+** siren's grotto
+
+# git@github.com:EQEmu/zone-utilities.git
+cd ~/src/zone-utilities/EverQuest
+mkdir sirens-grotto
+../build/bin/pfs l \* sirens.s3d | while read I; do ../build/bin/pfs e sirens.s3d "$I"; mv "$I" sirens-grotto/; done
+../build/bin/pfs l \* sirens_obj.s3d | while read I; do ../build/bin/pfs e sirens_obj.s3d "$I"; mv "$I" sirens-grotto/; done
+mv sirens-grotto ~/eq/
+cd ~/eq/sirens-grotto
+~/src/eqwld-obj/eqwld-to-obj-gauche.scm --solid sirens.wld > sirens-solid.obj
+~/src/eqwld-obj/eqwld-to-obj-gauche.scm --phantom sirens.wld > sirens-phantom.obj
+~/src/eqwld-obj/eqwld-to-obj-gauche.scm --placeables . sirens_obj.wld
+
+# use ImageMagicK to convert
+for file in *.bmp
+do
+    convert "$file" "$(basename "$file" .bmp).png"
+done
+
+ls *.png > sirens-grotto.mtl
+
+
+newmtl bridgewood
+Ka 1.000 1.000 1.000
+Kd 1.000 1.000 1.000
+Ks 0.000 0.000 0.000
+d 1.0
+illum 2
+map_Ka bridgewood.png
+map_Kd bridgewood.png
+
+
+
+** oggok
+
+;; pfs l \* oggok.s3d | while read I; do ../build/bin/pfs e oggok.s3d "$I"; mv "$I" oggok/; done
+
+** upper guk
+
+;; ../build/bin/pfs l \* guktop.s3d | while read I; do ../build/bin/pfs e guktop.s3d "$I"; mv "$I" upper-guk/; done
+
+;; ~/src/eqwld-obj/eqwld-to-obj-gauche.scm --placeables . oggok_obj.wld 2> err
+
+
+;; ~/src/eqwld-obj/eqwld-to-obj-gauche.scm --solid guktop.wld > upper-guk-solid.obj
+;; ~/src/eqwld-obj/eqwld-to-obj-gauche.scm --phantom guktop.wld > upper-guk-water.obj
+

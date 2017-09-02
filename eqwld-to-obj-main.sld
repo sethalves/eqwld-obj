@@ -1,15 +1,4 @@
 
-;; pfs l \* oggok.s3d | while read I; do ../build/bin/pfs e oggok.s3d "$I"; mv "$I" oggok/; done
-
-
-;; -- use ImageMagicK to convert
-;; for file in *.bmp
-;; do
-;;     convert "$file" "$(basename "$file" .bmp).png"
-;; done
-
-
-;; ~/src/eqwld-obj/eqwld-to-obj-gauche.scm --placeables . oggok_obj.wld 2> err
 
 (define-library (eqwld-to-obj-main)
   (export main-program)
@@ -79,7 +68,8 @@
 
     (define (read-version wld-data i)
       ;; Version : DWORD
-      ;; For old-format .WLD files, this always contains 0x00015500. For new-format .WLD files, this always contains 0x1000C800.
+      ;; For old-format .WLD files, this always contains 0x00015500. For new-format .WLD files, this always
+      ;; contains 0x1000C800.
       (read-dword wld-data i))
 
     (define (read-fragment-count wld-data i)
@@ -585,23 +575,23 @@
                          (cons material-name rev-material-names))))))
 
         ;; VertexTex entries
-        (let loop ((j 0))
-          (cond ((= j vertex-tex-count)
-                 #t)
-                (else
-                 (read-2bytes)
-                 (read-2bytes)
-                 (loop (+ j 1)))))
+        ;; (let loop ((j 0))
+        ;;   (cond ((= j vertex-tex-count)
+        ;;          #t)
+        ;;         (else
+        ;;          (read-2bytes)
+        ;;          (read-2bytes)
+        ;;          (loop (+ j 1)))))
 
-        (let loop ((j 0))
-          (cond ((= j size-9) #t)
-                (else
-                 (let* ((vertex-index-1 (read-2bytes))
-                        (vertex-index-2 (read-2bytes))
-                        (data9-param1 (read-2bytes))
-                        (data9-type (read-2bytes)))
-                   (cerr "data9: " (list vertex-index-1 vertex-index-2 data9-param1 data9-type) "\n")
-                   (loop (+ j 1))))))
+        ;; (let loop ((j 0))
+        ;;   (cond ((= j size-9) #t)
+        ;;         (else
+        ;;          (let* ((vertex-index-1 (read-2bytes))
+        ;;                 (vertex-index-2 (read-2bytes))
+        ;;                 (data9-param1 (read-2bytes))
+        ;;                 (data9-type (read-2bytes)))
+        ;;            ;; (cerr "data9: " (list vertex-index-1 vertex-index-2 data9-param1 data9-type) "\n")
+        ;;            (loop (+ j 1))))))
 
         (vector-set! frags frag-index (make-fragment-36 name texture-frag-indices vertices texture-coords vertex-colors
                                                         tex-coords normals mat-face-counts material-names frag-faces-corners))
@@ -776,8 +766,8 @@
                  (snow-assert #f)))
           (step-i)
 
-          (let* ((version (number->string (read-version wld-data (step-i)) 16))
-                 (old #t) ;; XXX based on version
+          (let* ((version (read-version wld-data (step-i)))
+                 (old (= version #x00015500)) ;; 0x1000C800 for new
                  (fragment-count (read-fragment-count wld-data (step-i)))
                  (header-3 (read-header-3 wld-data (step-i)))
                  (header-4 (number->string (read-header-4 wld-data (step-i)) 16))
@@ -788,7 +778,7 @@
                  )
 
             (set! i (+ i string-hash-size))
-            (cerr "version = " version "\n")
+            (cerr "version = " (number->string version 16) "\n")
             (cerr "fragment count = " fragment-count "\n")
             (cerr "header-3 = " header-3 "\n")
             (cerr "header-4 = " header-4 "\n")
@@ -808,12 +798,14 @@
               (if (not (snow-file-directory? placeables-output-directory))
                   (snow-create-directory placeables-output-directory))
               ;; 14 --> 2d --> 36
+              ;; 11 --> 10 -->
               (do ((frag-index 0 (+ frag-index 1)))
                   ((= frag-index fragment-count) #t)
                 (let ((frag (vector-ref frags frag-index)))
                   (cond ((fragment-14? frag)
                          (for-each
                           (lambda (frag-2d-ref)
+                            (cerr "frag-2d-ref = " frag-2d-ref "\n")
                             (let* ((frag-2d (vector-ref frags frag-2d-ref))
                                    (frag-36 (vector-ref frags (fragment-2d-reference frag-2d))))
                               (cond ((fragment-36? frag-36)
